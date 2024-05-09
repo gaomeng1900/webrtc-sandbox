@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import chalk from 'chalk'
 
-function App() {
+function Page() {
 	const searchParams = new URLSearchParams(window.location.search)
 	const id = searchParams.get('id')
 	const ip = searchParams.get('ip')
@@ -43,4 +43,4 @@ function App() {
 	return <></>
 }
 
-export default App
+export default Page

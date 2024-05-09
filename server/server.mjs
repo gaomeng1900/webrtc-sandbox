@@ -1,4 +1,4 @@
-import WebSocket, { WebSocketServer } from 'ws'
+import { WebSocketServer } from 'ws'
 import https from 'https'
 import selfSigned from 'openssl-self-signed-certificate'
 import chalk from 'chalk'
