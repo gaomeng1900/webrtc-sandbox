@@ -26,7 +26,7 @@ function Page() {
 
 			setWs(ws)
 
-			ws.send('hahahha')
+			ws.send(JSON.stringify({ type: 'greeting', data: 'hello!' }))
 		}
 
 		ws.onmessage = (event) => {
@@ -40,6 +40,7 @@ function Page() {
 			setWs(null)
 		}
 	}, [id])
+
 	return <></>
 }
 

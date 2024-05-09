@@ -25,12 +25,26 @@ const config = {
 const server = https.createServer(serverOptions)
 const wsServer = new WebSocketServer({ server })
 
+const sockets = new Map()
+
+/**
+ * 请求的消息格式
+ *
+ * @typedef {Object} RequestMessage
+ * @property {string} type - 消息类型
+ * @property {string} [data] - 数据，若为空则不发送
+ * @property {string} [targetID] - 发送目标的 ID，若为空则不发送
+ */
+
 wsServer.on('connection', (ws, req) => {
 	const url = new URL(req.url, `https://${req.headers.host}`)
 	const searchParams = url.searchParams
 	const id = searchParams.get('id')
+	const clientIP = req.socket.remoteAddress
 
-	console.log(chalk.greenBright.bold('new connection', 'id:', id))
+	console.log(
+		chalk.greenBright.bold('new connection:', 'id:', id, ', ip:', clientIP),
+	)
 
 	ws.on('message', (message) => {
 		console.log(
@@ -39,7 +53,61 @@ wsServer.on('connection', (ws, req) => {
 			message.toString(),
 		)
 
-		ws.send(`got`)
+		if (!id) {
+			const res = {
+				success: false,
+				type: 'reg_respose',
+				error: 'id is required',
+			}
+
+			ws.send(JSON.stringify(res))
+			return
+		}
+
+		sockets.set(id, ws)
+
+		try {
+			const msg = JSON.parse(message)
+			const { type, data, targetID } = msg
+
+			if (data && targetID) {
+				const targetSocket = sockets.get(targetID)
+				if (targetSocket) {
+					targetSocket.send(
+						JSON.stringify({ type, data, sourceID: id }),
+					)
+				} else {
+					console.log(
+						chalk.yellow.bold('target socket not found:', targetID),
+					)
+
+					// const res = {
+					// 	success: false,
+					// 	type: 'reg_respose',
+					// 	error: 'target socket not found',
+					// }
+					// ws.send(JSON.stringify(res))
+					// return
+				}
+			}
+
+			const res = { success: true, type: 'reg_respose' }
+			ws.send(JSON.stringify(res))
+		} catch (error) {
+			if (error instanceof SyntaxError) {
+				console.log(chalk.yellow('json 无法解析', message.toString()))
+
+				const res = {
+					success: false,
+					type: 'reg_respose',
+					error: 'invalid json',
+				}
+				ws.send(JSON.stringify(res))
+				return
+			} else {
+				console.log(chalk.red.bold('未知错误'), error)
+			}
+		}
 	})
 
 	ws.on('close', () => {
