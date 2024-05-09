@@ -1,23 +1,23 @@
 import { useEffect, useState } from 'react'
-
 import chalk from 'chalk'
+
+const hostname = window.location.hostname
 
 function Page() {
 	const searchParams = new URLSearchParams(window.location.search)
 	const id = searchParams.get('id')
-	const ip = searchParams.get('ip')
 
 	const [ws, setWs] = useState<WebSocket | null>(null)
 
 	useEffect(() => {
 		console.log(chalk.greenBright.bold.bgBlack('Initing App...'))
 
-		if (!id || !ip) {
-			console.error(chalk.red('Missing id or ip in query params'))
+		if (!id) {
+			console.error(chalk.red('Missing id in query params'))
 			return
 		}
 
-		const url = `wss://${ip}:443?id=${id}`
+		const url = `wss://${hostname}:443?id=${id}`
 
 		const ws = new WebSocket(url)
 
@@ -39,7 +39,7 @@ function Page() {
 			ws.close()
 			setWs(null)
 		}
-	}, [id, ip])
+	}, [id])
 	return <></>
 }
 
