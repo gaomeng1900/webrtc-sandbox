@@ -1,6 +1,14 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 
+import adapter from 'webrtc-adapter'
+console.log(
+	'adapter',
+	adapter.browserDetails.browser,
+	adapter.browserDetails.version,
+)
+
 import Websocket from './pages/Websocket'
+import RTC from './pages/RTC'
 
 const router = createBrowserRouter([
 	{
@@ -10,6 +18,10 @@ const router = createBrowserRouter([
 	{
 		path: '/ws',
 		element: <Websocket />,
+	},
+	{
+		path: '/rtc',
+		element: <RTC />,
 	},
 ])
 

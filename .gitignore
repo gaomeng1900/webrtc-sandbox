@@ -142,3 +142,5 @@ dist
 /package-lock.json
 
 **/.DS_Store
+
+*.mp4

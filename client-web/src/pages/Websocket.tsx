@@ -17,7 +17,7 @@ function Page() {
 			return
 		}
 
-		const url = `wss://${hostname}:443?id=${id}`
+		const url = `ws://${hostname}?id=${id}`
 
 		const ws = new WebSocket(url)
 
