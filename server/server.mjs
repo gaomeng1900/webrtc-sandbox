@@ -43,32 +43,57 @@ wsServer.on('connection', (ws, req) => {
 	const clientIP = req.socket.remoteAddress
 
 	console.log(
-		chalk.greenBright.bold('new connection:', 'id:', id, ', ip:', clientIP),
+		chalk.greenBright.bold('🌟 new connection:'),
+		chalk.green(id, '@', clientIP),
 	)
+
+	// 注册 IP 并发送注册结果
+
+	if (!id) {
+		const res = {
+			success: false,
+			type: 'register',
+			error: 'id is required',
+		}
+
+		ws.send(JSON.stringify(res))
+		return
+	}
+
+	if (!sockets.get(id)) {
+		const res = { success: true, type: 'register' }
+		ws.send(JSON.stringify(res))
+	} else if (sockets.get(id) !== ws) {
+		console.log(
+			chalk.yellow.bold('\t└ id already registered:', id),
+			chalk.yellow.bold('replacing socket'),
+		)
+
+		const res = {
+			success: true,
+			type: 'register',
+			message: 'id already registered, replacing the existing socket.',
+		}
+		ws.send(JSON.stringify(res))
+	}
+
+	sockets.set(id, ws)
+
+	// 接收消息
 
 	ws.on('message', (message) => {
 		console.log(
+			'📩',
 			chalk.blue.bold(id),
 			chalk.magenta.bold(`received:`),
 			message.toString(),
 		)
 
-		if (!id) {
-			const res = {
-				success: false,
-				type: 'reg_respose',
-				error: 'id is required',
-			}
-
-			ws.send(JSON.stringify(res))
-			return
-		}
-
-		sockets.set(id, ws)
-
 		try {
 			const msg = JSON.parse(message)
 			const { type, data, targetID } = msg
+
+			// 转发
 
 			if (data && targetID) {
 				const targetSocket = sockets.get(targetID)
@@ -76,42 +101,53 @@ wsServer.on('connection', (ws, req) => {
 					targetSocket.send(
 						JSON.stringify({ type, data, sourceID: id }),
 					)
+					console.log(
+						chalk.magenta.bold(`\t└ transfer to ${targetID} ✅`),
+					)
 				} else {
 					console.log(
-						chalk.yellow.bold('target socket not found:', targetID),
+						chalk.yellow.bold(
+							'\t└ target socket not found:',
+							targetID,
+						),
 					)
 
-					// const res = {
-					// 	success: false,
-					// 	type: 'reg_respose',
-					// 	error: 'target socket not found',
-					// }
-					// ws.send(JSON.stringify(res))
-					// return
+					const res = {
+						success: false,
+						type: 'error',
+						error: 'target socket not found',
+					}
+					ws.send(JSON.stringify(res))
+					return
 				}
 			}
-
-			const res = { success: true, type: 'reg_respose' }
-			ws.send(JSON.stringify(res))
 		} catch (error) {
 			if (error instanceof SyntaxError) {
 				console.log(chalk.yellow('json 无法解析', message.toString()))
 
 				const res = {
 					success: false,
-					type: 'reg_respose',
+					type: 'error',
 					error: 'invalid json',
 				}
 				ws.send(JSON.stringify(res))
 				return
 			} else {
 				console.log(chalk.red.bold('未知错误'), error)
+
+				const res = {
+					success: false,
+					type: 'error',
+					error: error.message,
+				}
+				ws.send(JSON.stringify(res))
+				return
 			}
 		}
 	})
 
 	ws.on('close', () => {
-		console.log('connection closed')
+		console.log(chalk.red.bold('👋 connection closed:', id))
 	})
 
 	ws.on('error', (err) => {

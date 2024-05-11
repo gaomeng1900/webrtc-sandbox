@@ -26,7 +26,13 @@ function Page() {
 
 			setWs(ws)
 
-			ws.send(JSON.stringify({ type: 'greeting', data: 'hello!' }))
+			ws.send(
+				JSON.stringify({
+					type: 'greeting',
+					data: 'hello!',
+					targetID: '112',
+				}),
+			)
 		}
 
 		ws.onmessage = (event) => {
