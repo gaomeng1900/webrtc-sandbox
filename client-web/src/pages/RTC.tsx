@@ -47,7 +47,7 @@ function Page() {
 		const url = `ws://${hostname}?id=${id}`
 
 		const ws = new WebSocket(url)
-		ws.binaryType = 'blob'
+		// ws.binaryType = 'blob'
 
 		ws.onopen = () => {
 			console.log(chalk.greenBright.bold.bgBlack('Connected to server'))
@@ -77,6 +77,8 @@ function Page() {
 
 	// 建立 rtc 链接
 
+	const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null)
+
 	const videoElemRef = useRef<HTMLVideoElement>(null!)
 
 	// 发送侧
@@ -95,6 +97,17 @@ function Page() {
 		const stream = (videoElem as any).captureStream() as MediaStream
 
 		const peerConnection = new RTCPeerConnection(peerConnectionOptions)
+
+		const dataChannel = peerConnection.createDataChannel(
+			'control channel',
+			{
+				ordered: true,
+			},
+		)
+		dataChannel.onopen = () => {
+			console.log(chalk.green('Data channel opened'))
+			setDataChannel(dataChannel)
+		}
 
 		stream.getTracks().forEach((track) => {
 			peerConnection.addTrack(track, stream)
@@ -160,6 +173,13 @@ function Page() {
 
 		const peerConnection = new RTCPeerConnection(peerConnectionOptions)
 
+		peerConnection.ondatachannel = (event) => {
+			const dataChannel = event.channel
+			console.log(chalk.green('Data channel opened'))
+			setDataChannel(dataChannel)
+			;(globalThis as any)['dataChannel'] = dataChannel
+		}
+
 		peerConnection.onicecandidate = (event) => {
 			if (event.candidate) {
 				console.log(
@@ -221,6 +241,99 @@ function Page() {
 			}
 		}
 	}, [ws, id, targetID, role])
+
+	// 鼠标事件
+	useEffect(() => {
+		if (role !== 'receiver') return
+		if (!dataChannel) return
+
+		const video = videoElemRef.current
+
+		const send = (data: any) => {
+			console.log(chalk.yellow('Sending data...'), data)
+			dataChannel.send(data)
+		}
+
+		// 使用 adb 的 input motionevent 转发鼠标事件
+
+		// 由于视频缩放过，这里需要获取视频的实际大小
+		const src = video.srcObject as MediaStream
+		const srcSettings = src.getVideoTracks()[0].getSettings()
+		let screenWidth = srcSettings.width!
+		let screenHeight = srcSettings.height!
+
+		let pointerDown = false
+
+		// move 事件限流
+		const moveThrottle = 1000 / 30
+		let lastMoveTime = performance.now()
+
+		const onDown = (event: MouseEvent) => {
+			const displayRect = video.getBoundingClientRect()
+			const src = video.srcObject as MediaStream
+			const srcSettings = src.getVideoTracks()[0].getSettings()
+			screenWidth = srcSettings.width!
+			screenHeight = srcSettings.height!
+
+			console.log('screenWidth:', screenWidth)
+			console.log('screenHeight:', screenHeight)
+
+			pointerDown = true
+
+			const x = event.clientX - displayRect.left
+			const y = event.clientY - displayRect.top
+
+			console.log('x:', x)
+			console.log('y:', y)
+
+			const xInScreen = (x / displayRect.width) * screenWidth
+			const yInScreen = (y / displayRect.height) * screenHeight
+
+			send(`su -c input motionevent DOWN ${xInScreen} ${yInScreen}`)
+		}
+
+		const onMove = (event: MouseEvent) => {
+			if (!pointerDown) return
+
+			const now = performance.now()
+			if (now - lastMoveTime < moveThrottle) return
+			lastMoveTime = now
+
+			const displayRect = video.getBoundingClientRect()
+
+			const x = event.clientX - displayRect.left
+			const y = event.clientY - displayRect.top
+
+			const xInScreen = (x / displayRect.width) * screenWidth
+			const yInScreen = (y / displayRect.height) * screenHeight
+
+			send(`su -c input motionevent MOVE ${xInScreen} ${yInScreen}`)
+		}
+
+		const onUp = (event: MouseEvent) => {
+			pointerDown = false
+
+			const displayRect = video.getBoundingClientRect()
+
+			const x = event.clientX - displayRect.left
+			const y = event.clientY - displayRect.top
+
+			const xInScreen = (x / displayRect.width) * screenWidth
+			const yInScreen = (y / displayRect.height) * screenHeight
+
+			send(`su -c input motionevent UP ${xInScreen} ${yInScreen}`)
+		}
+
+		video.addEventListener('mousedown', onDown)
+		video.addEventListener('mousemove', onMove)
+		video.addEventListener('mouseup', onUp)
+
+		return () => {
+			video.removeEventListener('mousedown', onDown)
+			video.removeEventListener('mousemove', onMove)
+			video.removeEventListener('mouseup', onUp)
+		}
+	}, [role, dataChannel])
 
 	return (
 		<div
