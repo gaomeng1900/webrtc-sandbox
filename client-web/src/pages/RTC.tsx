@@ -9,7 +9,6 @@ const peerConnectionOptions = {
 		{
 			urls: 'stun:114.55.245.37',
 			// urls: 'stun:stun.voipstunt.com',
-
 			credential: 'jdhegfl',
 			username: 'test',
 		},
@@ -205,6 +204,14 @@ function Page() {
 			}
 
 			videoElem.srcObject = event.streams[0]
+
+			console.log('remote strean', event.streams[0])
+
+			// 注意，接收端拿到的 sender 没有用，要在发送端拿到 sender 修改视频参数
+			// const senders = peerConnection.getSenders()
+			// console.log('senders:', senders)
+			// const params = senders[0].getParameters()
+			// console.log('params:', params)
 		}
 
 		ws.onmessage = (event) => {
@@ -243,11 +250,14 @@ function Page() {
 	}, [ws, id, targetID, role])
 
 	// 鼠标事件
+	const pointerRef = useRef<HTMLDivElement>(null!)
+
 	useEffect(() => {
 		if (role !== 'receiver') return
 		if (!dataChannel) return
 
 		const video = videoElemRef.current
+		const pointer = pointerRef.current
 
 		const send = (data: any) => {
 			console.log(chalk.yellow('Sending data...'), data)
@@ -280,11 +290,12 @@ function Page() {
 
 			pointerDown = true
 
+			// pointer.style.visibility = 'visible'
+			pointer.style.backgroundColor = '#ffffffaa'
+			pointer.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`
+
 			const x = event.clientX - displayRect.left
 			const y = event.clientY - displayRect.top
-
-			console.log('x:', x)
-			console.log('y:', y)
 
 			const xInScreen = (x / displayRect.width) * screenWidth
 			const yInScreen = (y / displayRect.height) * screenHeight
@@ -293,13 +304,14 @@ function Page() {
 		}
 
 		const onMove = (event: MouseEvent) => {
+			const displayRect = video.getBoundingClientRect()
+			pointer.style.transform = `translate(${event.clientX}px, ${event.clientY}px)`
+
 			if (!pointerDown) return
 
 			const now = performance.now()
 			if (now - lastMoveTime < moveThrottle) return
 			lastMoveTime = now
-
-			const displayRect = video.getBoundingClientRect()
 
 			const x = event.clientX - displayRect.left
 			const y = event.clientY - displayRect.top
@@ -315,6 +327,9 @@ function Page() {
 
 			const displayRect = video.getBoundingClientRect()
 
+			// pointer.style.visibility = 'hidden'
+			pointer.style.backgroundColor = '#ffffff77'
+
 			const x = event.clientX - displayRect.left
 			const y = event.clientY - displayRect.top
 
@@ -324,14 +339,50 @@ function Page() {
 			send(`su -c input motionevent UP ${xInScreen} ${yInScreen}`)
 		}
 
+		const onEnter = (event: MouseEvent) => {
+			pointer.style.visibility = 'visible'
+		}
+
+		const onOut = (event: MouseEvent) => {
+			pointer.style.visibility = 'hidden'
+
+			if (!pointerDown) return
+			pointerDown = false
+
+			const displayRect = video.getBoundingClientRect()
+
+			const x = event.clientX - displayRect.left
+			const y = event.clientY - displayRect.top
+
+			const minmax = (min: number, max: number, value: number) =>
+				Math.min(max, Math.max(min, value))
+
+			const xInScreen = minmax(
+				0,
+				screenWidth,
+				(x / displayRect.width) * screenWidth,
+			)
+			const yInScreen = minmax(
+				0,
+				screenHeight,
+				(y / displayRect.height) * screenHeight,
+			)
+
+			send(`su -c input motionevent UP ${xInScreen} ${yInScreen}`)
+		}
+
 		video.addEventListener('mousedown', onDown)
 		video.addEventListener('mousemove', onMove)
 		video.addEventListener('mouseup', onUp)
+		video.addEventListener('mouseenter', onEnter)
+		video.addEventListener('mouseout', onOut)
 
 		return () => {
 			video.removeEventListener('mousedown', onDown)
 			video.removeEventListener('mousemove', onMove)
 			video.removeEventListener('mouseup', onUp)
+			video.removeEventListener('mouseenter', onEnter)
+			video.removeEventListener('mouseout', onOut)
 		}
 	}, [role, dataChannel])
 
@@ -365,6 +416,24 @@ function Page() {
 					<source src="/la-luna.mp4" type="video/mp4" />
 				)}
 			</video>
+
+			{/* 鼠标 */}
+			<div
+				ref={pointerRef}
+				style={{
+					visibility: 'hidden',
+					position: 'absolute',
+					top: '-20px',
+					left: '-20px',
+					width: '40px',
+					height: '40px',
+					backgroundColor: '#ffffff77',
+					borderRadius: '50%',
+					pointerEvents: 'none',
+					transition: 'backgroundColor 0.3s',
+					boxShadow: '0 0 10px 5px #ffffff55',
+				}}
+			/>
 		</div>
 	)
 }
