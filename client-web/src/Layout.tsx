@@ -9,6 +9,7 @@ console.log(
 
 import Websocket from './pages/Websocket'
 import RTC from './pages/RTC'
+import RTCReceiver from './pages/RTCReceiver'
 
 const router = createBrowserRouter([
 	{
@@ -22,6 +23,10 @@ const router = createBrowserRouter([
 	{
 		path: '/rtc',
 		element: <RTC />,
+	},
+	{
+		path: '/rtc-receiver',
+		element: <RTCReceiver />,
 	},
 ])
 
